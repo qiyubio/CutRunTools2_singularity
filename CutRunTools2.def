@@ -2,7 +2,7 @@ Bootstrap: library
 From: godloved/secure/ubuntu-bionic
 
 %labels
-	Author:Qi Yu
+	Author: Qi Yu(dryuqi@gmail.com)
 %post
 	apt-get update
 	apt-get -y install wget git jq ghostscript
