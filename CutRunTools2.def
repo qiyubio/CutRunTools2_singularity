@@ -1,0 +1,98 @@
+Bootstrap: library
+From: godloved/secure/ubuntu-bionic
+
+%labels
+	Author:Qi Yu
+%post
+	apt-get update
+	apt-get -y install wget git jq ghostscript
+
+	# set up conda env
+	wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+	bash Miniconda3-latest-Linux-x86_64.sh -p /opt/conda -b
+	. /opt/conda/etc/profile.d/conda.sh
+	conda update -n base conda
+	conda config --add channels conda-forge
+	conda config --add channels bioconda
+
+	# Install CutRunTools2
+	cd /opt
+	git clone https://github.com/fl-yu/CUT-RUNTools-2.0.git
+	cd CUT-RUNTools-2.0
+	conda create -n app python=3.6
+	conda activate app
+
+	# Install required software
+	conda install -y -c bioconda bowtie2
+	conda install -y -c bioconda samtools
+	conda install -y -c bioinfo macs2
+	conda install -y -c bioconda bedops
+	conda install -y -c bioconda bedtools
+	conda install -y -c bioconda deeptools
+	conda install -y -c conda-forge parallel
+	conda install -y -c bioconda tabix
+        conda install -y -c conda-forge python-igraph
+	pip install umap-learn leidenalg
+	conda deactivate
+
+	# Create env for meme since it will conflict with others
+	conda create -n meme python=3.6
+	conda activate meme
+	conda install meme=5.0.2 icu=58.2
+	pip install python3-ghostscript
+
+	# Install R/4.1 and R packages
+	apt-get -y install --no-install-recommends software-properties-common dirmngr gpg-agent
+	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+	add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+	apt-get -y install --no-install-recommends r-base
+	# Install compilers for R packages
+	apt-get -y install curl make gcc g++ cmake gfortran libcurl4-openssl-dev libreadline-dev libz-dev libbz2-dev liblzma-dev libpcre3-dev libssl-dev libopenblas-
+dev default-jre unzip libboost-all-dev libpng-dev libcairo2-dev tabix libxml2-dev
+	/usr/bin/Rscript ./install/r-pkgs-install.r
+
+	# Install Atactk and kseq
+	conda activate app
+	cd install
+
+	# Install atactk
+	cur=`pwd`
+	mkdir git
+	cd git
+	git clone https://github.com/ParkerLab/atactk
+	cd atactk
+	git checkout 6cd7de0
+	cd ..
+	pip install ./atactk
+
+	cd /opt/conda/envs/app/bin/
+	cp $cur/make_cut_matrix.patch .
+	patch -p0 -N --dry-run --silent make_cut_matrix < make_cut_matrix.patch 2> /dev/null
+	if [ $? -eq 0 ];
+	then
+	patch -p0 -N make_cut_matrix < make_cut_matrix.patch
+	fi
+
+	cd /opt/conda/envs/app/lib/python3.6/site-packages/atactk
+	cp $cur/metrics.py.patch .
+	patch -p0 -N --dry-run --silent metrics.py < metrics.py.patch 2> /dev/null
+	if [ $? -eq 0 ];
+	then
+	patch -p0 -N metrics.py < metrics.py.patch
+	fi
+
+	# test kseq
+	cd $cur
+	gcc -O2 kseq_test.c -lz -o kseq_test
+
+
+	# Change permission of sh files in install
+	chmod +x *.sh
+
+	# clean up
+	apt-get clean
+ 	conda clean --yes --all
+
+%environment
+	export LC_ALL=C
+	export PATH=/opt/conda/envs/app/bin:/opt/conda/envs/meme/bin:$PATH
